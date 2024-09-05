@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebRTC Image Sender</title>
+</head>
+<body>
+    <h1>Send Image via WebRTC</h1>
+    <input type="file" id="fileInput">
+    <button id="sendButton">Send Image</button>
+
+    <script>
+        const peerConnection = new RTCPeerConnection();
+        const dataChannel = peerConnection.createDataChannel("imageChannel");
+
+        // Setup the signaling server connection
+        const socket = new WebSocket('wss://your-signaling-server');
+
+        socket.onmessage = async (event) => {
+            const message = JSON.parse(event.data);
+
+            if (message.answer) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
+            } else if (message.candidate) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+            }
+        };
+
+        peerConnection.onicecandidate = event => {
+            if (event.candidate) {
+                socket.send(JSON.stringify({ candidate: event.candidate }));
+            }
+        };
+
+        peerConnection.createOffer().then(offer => {
+            peerConnection.setLocalDescription(offer);
+            socket.send(JSON.stringify({ offer: offer }));
+        });
+
+        const fileInput = document.getElementById('fileInput');
+        const sendButton = document.getElementById('sendButton');
+
+        sendButton.onclick = () => {
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                dataChannel.send(event.target.result);
+            };
+
+            reader.readAsArrayBuffer(file);
+        };
+    </script>
+</body>
+</html>

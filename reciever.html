@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebRTC Image Receiver</title>
+</head>
+<body>
+    <h1>Received Image</h1>
+    <img id="receivedImage">
+
+    <script>
+        const peerConnection = new RTCPeerConnection();
+
+        const socket = new WebSocket('wss://your-signaling-server');
+
+        socket.onmessage = async (event) => {
+            const message = JSON.parse(event.data);
+
+            if (message.offer) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(message.offer));
+
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                socket.send(JSON.stringify({ answer: answer }));
+            } else if (message.candidate) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+            }
+        };
+
+        peerConnection.ondatachannel = event => {
+            const dataChannel = event.channel;
+
+            dataChannel.onmessage = event => {
+                const blob = new Blob([event.data]);
+                const url = URL.createObjectURL(blob);
+
+                document.getElementById('receivedImage').src = url;
+            };
+        };
+    </script>
+</body>
+</html>
